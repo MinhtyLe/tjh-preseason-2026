@@ -486,7 +486,9 @@
     .h2h-cell{min-height:36px;font-size:10px;}
     .h2h-rowhead{font-size:10px;padding-left:2px;}
     .h2h-scroll-hint{display:block;text-align:right;}
+    .points-mobile-hint{display:block;margin-top:10px;}
   }
+  .points-mobile-hint{display:none;}
 
   .h2h-detail{
     margin-top:20px;
@@ -1151,6 +1153,7 @@ a quick introduction to himself.</p>
   <div class="card">
     <canvas id="pointsChart"></canvas>
   </div>
+  <p class="hint points-mobile-hint">Tap a slice for details — see the legend below for names and percentages.</p>
   <div class="legend" id="pointsLegend"></div>
 </section>
 
@@ -1500,25 +1503,46 @@ let standingsChartInstance = null;
   });
 
   const legendEl = document.getElementById('standingsLegend');
+  let standingsLocked = null;
+
+  function applyStandingsHighlight(name){
+    standingsChartInstance.data.datasets.forEach(ds => {
+      const isHovered = ds.label === name;
+      ds.borderColor = isHovered ? MANAGER_COLORS[name] : withAlpha(MANAGER_COLORS[ds.label], 0.12);
+      ds.borderWidth = isHovered ? 3.5 : 2;
+    });
+    standingsChartInstance.update('none');
+  }
+  function resetStandingsHighlight(){
+    standingsChartInstance.data.datasets.forEach(ds => {
+      ds.borderColor = MANAGER_COLORS[ds.label];
+      ds.borderWidth = 2;
+    });
+    standingsChartInstance.update('none');
+  }
+
   MANAGERS.forEach(name => {
     const chip = document.createElement('span');
     chip.className = 'chip' + (championCount(name) > 0 ? ' champ' : '');
     chip.innerHTML = `<span class="dot" style="background:${MANAGER_COLORS[name]}"></span>${nameWithTrophies(name)}`;
 
     chip.addEventListener('mouseenter', () => {
-      standingsChartInstance.data.datasets.forEach(ds => {
-        const isHovered = ds.label === name;
-        ds.borderColor = isHovered ? MANAGER_COLORS[name] : withAlpha(MANAGER_COLORS[ds.label], 0.12);
-        ds.borderWidth = isHovered ? 3.5 : 2;
-      });
-      standingsChartInstance.update('none');
+      if (standingsLocked) return;
+      applyStandingsHighlight(name);
     });
     chip.addEventListener('mouseleave', () => {
-      standingsChartInstance.data.datasets.forEach(ds => {
-        ds.borderColor = MANAGER_COLORS[ds.label];
-        ds.borderWidth = 2;
-      });
-      standingsChartInstance.update('none');
+      if (standingsLocked) return;
+      resetStandingsHighlight();
+    });
+    // tap support: mobile has no hover, so a tap "locks" the highlight until tapped again
+    chip.addEventListener('click', () => {
+      if (standingsLocked === name) {
+        standingsLocked = null;
+        resetStandingsHighlight();
+      } else {
+        standingsLocked = name;
+        applyStandingsHighlight(name);
+      }
     });
 
     legendEl.appendChild(chip);
@@ -1653,6 +1677,30 @@ function renderStatStrip(statsSource){
   });
 
   const legendEl = document.getElementById('scatterLegend');
+  let scatterLocked = null;
+
+  function currentScatterView(){
+    return SCATTER_VIEWS[document.querySelector('.tab-btn.active').dataset.tab === '2025' ? 'season2025' : 'alltime'];
+  }
+  function applyScatterHighlight(name){
+    scatterChartInstance.data.datasets.forEach(ds => {
+      if (ds.label === 'Win / Loss line') return;
+      const isHovered = ds.label === name;
+      ds.backgroundColor = isHovered ? withAlpha(MANAGER_COLORS[name], 1) : withAlpha(MANAGER_COLORS[ds.label], 0.01);
+      ds.borderColor = isHovered ? withAlpha(MANAGER_COLORS[name], 1) : withAlpha(MANAGER_COLORS[ds.label], 0.01);
+    });
+    scatterChartInstance.update('none');
+  }
+  function resetScatterHighlight(){
+    const view = currentScatterView();
+    scatterChartInstance.data.datasets.forEach(ds => {
+      if (ds.label === 'Win / Loss line') return;
+      ds.backgroundColor = withAlpha(MANAGER_COLORS[ds.label], view.alpha);
+      ds.borderColor = withAlpha(MANAGER_COLORS[ds.label], Math.min(view.alpha + 0.35, 1));
+    });
+    scatterChartInstance.update('none');
+  }
+
   MANAGERS.forEach(name => {
     const isReigningChamp = name === 'Abdullah';
     const chip = document.createElement('span');
@@ -1661,23 +1709,22 @@ function renderStatStrip(statsSource){
     chip.innerHTML = `<span class="dot" style="background:${MANAGER_COLORS[name]}"></span>${label}`;
 
     chip.addEventListener('mouseenter', () => {
-      const view = SCATTER_VIEWS[document.querySelector('.tab-btn.active').dataset.tab === '2025' ? 'season2025' : 'alltime'];
-      scatterChartInstance.data.datasets.forEach(ds => {
-        if (ds.label === 'Win / Loss line') return;
-        const isHovered = ds.label === name;
-        ds.backgroundColor = isHovered ? withAlpha(MANAGER_COLORS[name], 1) : withAlpha(MANAGER_COLORS[ds.label], 0.01);
-        ds.borderColor = isHovered ? withAlpha(MANAGER_COLORS[name], 1) : withAlpha(MANAGER_COLORS[ds.label], 0.01);
-      });
-      scatterChartInstance.update('none');
+      if (scatterLocked) return;
+      applyScatterHighlight(name);
     });
     chip.addEventListener('mouseleave', () => {
-      const view = SCATTER_VIEWS[document.querySelector('.tab-btn.active').dataset.tab === '2025' ? 'season2025' : 'alltime'];
-      scatterChartInstance.data.datasets.forEach(ds => {
-        if (ds.label === 'Win / Loss line') return;
-        ds.backgroundColor = withAlpha(MANAGER_COLORS[ds.label], view.alpha);
-        ds.borderColor = withAlpha(MANAGER_COLORS[ds.label], Math.min(view.alpha + 0.35, 1));
-      });
-      scatterChartInstance.update('none');
+      if (scatterLocked) return;
+      resetScatterHighlight();
+    });
+    // tap support: mobile has no hover, so a tap "locks" the highlight until tapped again
+    chip.addEventListener('click', () => {
+      if (scatterLocked === name) {
+        scatterLocked = null;
+        resetScatterHighlight();
+      } else {
+        scatterLocked = name;
+        applyScatterHighlight(name);
+      }
     });
 
     legendEl.appendChild(chip);
@@ -1701,6 +1748,8 @@ function renderStatStrip(statsSource){
       scatterChartInstance.update();
       document.getElementById('scatterDek').textContent = view.dek;
       renderStatStrip(view.statsSource);
+      // if a manager was locked-highlighted before switching tabs, keep it locked under the new view
+      if (scatterLocked) applyScatterHighlight(scatterLocked);
     });
   });
 })();
@@ -1736,6 +1785,34 @@ function renderStatStrip(statsSource){
 
   const grid = document.getElementById('h2hGrid');
   const detail = document.getElementById('h2hDetail');
+  let h2hLockedCell = null;
+
+  function renderH2HDetail(rowName, colName, entry){
+    const gamesHtml = entry.games.length
+      ? entry.games.map(g => {
+          const won = g.my_score > g.opp_score, tied = g.my_score === g.opp_score;
+          const tag = tied ? 'T' : (won ? 'W' : 'L');
+          const tagClass = tied ? 'tie' : (won ? 'win' : 'loss');
+          return `<div class="h2h-game-row">
+            <span class="h2h-game-year">${g.year} · Wk ${g.week}</span>
+            <span class="h2h-game-score">${g.my_score.toFixed(2)} – ${g.opp_score.toFixed(2)}</span>
+            <span class="h2h-game-tag ${tagClass}">${tag}</span>
+          </div>`;
+        }).join('')
+      : '<p class="h2h-detail-placeholder">No individual game data reconstructed for this pairing.</p>';
+    detail.innerHTML = `
+      <div class="h2h-detail-head">
+        <span class="dot" style="background:${MANAGER_COLORS[rowName]}"></span>${rowName}
+        <span class="h2h-detail-vs">vs</span>
+        <span class="dot" style="background:${MANAGER_COLORS[colName]}"></span>${colName}
+        <span class="h2h-detail-record">${entry.record || '—'}</span>
+      </div>
+      <div class="h2h-game-list">${gamesHtml}</div>
+    `;
+  }
+  function resetH2HDetail(){
+    detail.innerHTML = '<p class="h2h-detail-placeholder">Hover (or tap) a cell above to see the game-by-game history.</p>';
+  }
 
   // corner cell
   grid.appendChild(Object.assign(document.createElement('div'), {className:'h2h-cell h2h-corner'}));
@@ -1769,30 +1846,27 @@ function renderStatStrip(statsSource){
       cell.textContent = entry.record || '—';
 
       cell.addEventListener('mouseenter', () => {
+        if (h2hLockedCell) return;
         cell.classList.add('h2h-hovered');
-        const gamesHtml = entry.games.length
-          ? entry.games.map(g => {
-              const won = g.my_score > g.opp_score, tied = g.my_score === g.opp_score;
-              const tag = tied ? 'T' : (won ? 'W' : 'L');
-              const tagClass = tied ? 'tie' : (won ? 'win' : 'loss');
-              return `<div class="h2h-game-row">
-                <span class="h2h-game-year">${g.year} · Wk ${g.week}</span>
-                <span class="h2h-game-score">${g.my_score.toFixed(2)} – ${g.opp_score.toFixed(2)}</span>
-                <span class="h2h-game-tag ${tagClass}">${tag}</span>
-              </div>`;
-            }).join('')
-          : '<p class="h2h-detail-placeholder">No individual game data reconstructed for this pairing.</p>';
-        detail.innerHTML = `
-          <div class="h2h-detail-head">
-            <span class="dot" style="background:${MANAGER_COLORS[rowName]}"></span>${rowName}
-            <span class="h2h-detail-vs">vs</span>
-            <span class="dot" style="background:${MANAGER_COLORS[colName]}"></span>${colName}
-            <span class="h2h-detail-record">${entry.record || '—'}</span>
-          </div>
-          <div class="h2h-game-list">${gamesHtml}</div>
-        `;
+        renderH2HDetail(rowName, colName, entry);
       });
-      cell.addEventListener('mouseleave', () => { cell.classList.remove('h2h-hovered'); });
+      cell.addEventListener('mouseleave', () => {
+        if (h2hLockedCell) return;
+        cell.classList.remove('h2h-hovered');
+      });
+      // tap support: mobile has no hover, so a tap "locks" the detail panel until tapped again
+      cell.addEventListener('click', () => {
+        if (h2hLockedCell === cell) {
+          cell.classList.remove('h2h-hovered');
+          h2hLockedCell = null;
+          resetH2HDetail();
+        } else {
+          if (h2hLockedCell) h2hLockedCell.classList.remove('h2h-hovered');
+          cell.classList.add('h2h-hovered');
+          h2hLockedCell = cell;
+          renderH2HDetail(rowName, colName, entry);
+        }
+      });
 
       grid.appendChild(cell);
     });
@@ -1941,6 +2015,12 @@ function renderStatStrip(statsSource){
   const sliceLabelPlugin = {
     id: 'sliceLabels',
     afterDraw(chart){
+      // On phone-sized screens there just isn't room for 14 on-chart text labels without
+      // them overlapping. The legend below the chart already shows every name + percentage,
+      // and tapping a slice pops the native tooltip — so skip on-canvas labels on mobile
+      // entirely rather than keep shrinking them until they're unreadable.
+      if (IS_MOBILE) return;
+
       const {ctx, chartArea} = chart;
       const meta = chart.getDatasetMeta(0);
       const cx = (chartArea.left + chartArea.right) / 2;
@@ -2034,7 +2114,7 @@ function renderStatStrip(statsSource){
       responsive: true,
       maintainAspectRatio: false,
       cutout: '58%',
-      layout: { padding: IS_MOBILE ? { top: 36, bottom: 36, left: 58, right: 58 } : { top: 60, bottom: 60, left: 190, right: 190 } },
+      layout: { padding: IS_MOBILE ? { top: 16, bottom: 16, left: 16, right: 16 } : { top: 60, bottom: 60, left: 190, right: 190 } },
       plugins: {
         legend: { display: false },
         tooltip: {
